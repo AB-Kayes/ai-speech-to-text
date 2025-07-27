@@ -180,9 +180,13 @@ function AppContent() {
           confidence,
         })
         // Save to database via API
-        fetch("/api/history/save", {
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        fetch("/api/history", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             text: transcript,
             type: "live",

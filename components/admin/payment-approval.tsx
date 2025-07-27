@@ -3,10 +3,11 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { Check, X, User, Phone, CreditCard, Calendar, Search } from "lucide-react"
-import type { Payment } from "@/lib/models"
+import type { Payment } from "@/lib/models";
+type PaymentWithId = Payment & { id?: string };
 
 const PaymentApproval: React.FC = () => {
-  const [payments, setPayments] = useState<Payment[]>([])
+  const [payments, setPayments] = useState<PaymentWithId[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -56,7 +57,7 @@ const PaymentApproval: React.FC = () => {
         },
         body: JSON.stringify({
           paymentId,
-          action,
+          status: action === "approve" ? "approved" : "rejected",
         }),
       })
 
@@ -189,77 +190,80 @@ const PaymentApproval: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredPayments.map((payment) => (
-            <div
-              key={payment._id?.toString()}
-              className="bg-gray-800/30 border border-violet-500/20 rounded-lg p-6 hover:bg-gray-800/50 transition-colors"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-violet-600 to-purple-600 rounded-full flex items-center justify-center">
-                      <User className="w-5 h-5 text-white" />
+          {filteredPayments.map((payment, idx) => {
+            const paymentId = payment._id ? payment._id.toString() : payment.id;
+            return (
+              <div
+                key={paymentId ? paymentId : `payment-${idx}`}
+                className="bg-gray-800/30 border border-violet-500/20 rounded-lg p-6 hover:bg-gray-800/50 transition-colors"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-gradient-to-r from-violet-600 to-purple-600 rounded-full flex items-center justify-center">
+                        <User className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-white font-semibold">{payment.userName}</h3>
+                        <p className="text-gray-400 text-sm">{payment.userEmail}</p>
+                      </div>
+                      <div
+                        className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(payment.status)}`}
+                      >
+                        {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-white font-semibold">{payment.userName}</h3>
-                      <p className="text-gray-400 text-sm">{payment.userEmail}</p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-300 text-sm">{payment.phoneNumber}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-300 text-sm">{payment.transactionId}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-violet-400 font-semibold">${payment.amount}</span>
+                        <span className="text-gray-400 text-sm">({payment.credits} credits)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-300 text-sm">{formatDate(payment.createdAt)}</span>
+                      </div>
                     </div>
-                    <div
-                      className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(payment.status)}`}
-                    >
-                      {payment.status.charAt(0).toUpperCase() + payment.status.slice(1)}
-                    </div>
+
+                    {payment.status === "approved" && payment.approvedAt && payment.approvedBy && (
+                      <div className="text-sm text-green-400 mb-2">
+                        Approved by {payment.approvedBy} on {formatDate(payment.approvedAt)}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-300 text-sm">{payment.phoneNumber}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-300 text-sm">{payment.transactionId}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-violet-400 font-semibold">${payment.amount}</span>
-                      <span className="text-gray-400 text-sm">({payment.credits} credits)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-300 text-sm">{formatDate(payment.createdAt)}</span>
-                    </div>
-                  </div>
-
-                  {payment.status === "approved" && payment.approvedAt && payment.approvedBy && (
-                    <div className="text-sm text-green-400 mb-2">
-                      Approved by {payment.approvedBy} on {formatDate(payment.approvedAt)}
+                  {payment.status === "pending" && paymentId && (
+                    <div className="flex items-center gap-2 ml-4">
+                      <button
+                        onClick={() => handleApproval(paymentId, "approve")}
+                        disabled={processingId === paymentId}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-600/50 text-white rounded-lg transition-colors"
+                      >
+                        <Check className="w-4 h-4" />
+                        {processingId === paymentId ? "Processing..." : "Approve"}
+                      </button>
+                      <button
+                        onClick={() => handleApproval(paymentId, "reject")}
+                        disabled={processingId === paymentId}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white rounded-lg transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                        {processingId === paymentId ? "Processing..." : "Reject"}
+                      </button>
                     </div>
                   )}
                 </div>
-
-                {payment.status === "pending" && (
-                  <div className="flex items-center gap-2 ml-4">
-                    <button
-                      onClick={() => handleApproval(payment._id!.toString(), "approve")}
-                      disabled={processingId === payment._id?.toString()}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-600/50 text-white rounded-lg transition-colors"
-                    >
-                      <Check className="w-4 h-4" />
-                      {processingId === payment._id?.toString() ? "Processing..." : "Approve"}
-                    </button>
-                    <button
-                      onClick={() => handleApproval(payment._id!.toString(), "reject")}
-                      disabled={processingId === payment._id?.toString()}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 text-white rounded-lg transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                      {processingId === payment._id?.toString() ? "Processing..." : "Reject"}
-                    </button>
-                  </div>
-                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

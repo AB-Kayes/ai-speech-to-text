@@ -34,36 +34,54 @@ interface UserHistoryModalProps {
 }
 
 const UserHistoryModal: React.FC<UserHistoryModalProps> = ({ isOpen, onClose, user }) => {
+
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const { token } = useAuth();
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchUserHistory = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        setError("Authentication required")
+        setIsLoading(false)
+        return
+      }
+      const response = await fetch("/api/history", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      if (!response.ok) {
+        throw new Error("Failed to fetch history")
+      }
+      const data = await response.json()
+      const transformedHistory: HistoryItem[] = data.history.map((item: any) => ({
+        _id: item._id || item.timestamp,
+        text: item.text,
+        type: item.type,
+        fileName: item.fileName,
+        language: item.language,
+        timestamp: item.timestamp.toString(),
+        duration: item.duration,
+        confidence: item.confidence,
+      }))
+      setHistory(transformedHistory)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch history")
+      console.error("Error fetching history:", err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (isOpen && user) {
       fetchUserHistory()
     }
   }, [isOpen, user])
-
-  const fetchUserHistory = async () => {
-    if (!user) return
-
-    setIsLoading(true)
-    try {
-      const response = await fetch(`/api/admin/users?userId=${user._id}`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setHistory(data.history || [])
-      }
-    } catch (error) {
-      console.error("Error fetching user history:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const formatDate = (dateString: string) => {
     try {
@@ -81,6 +99,7 @@ const UserHistoryModal: React.FC<UserHistoryModalProps> = ({ isOpen, onClose, us
     return `${minutes}:${seconds.toString().padStart(2, "0")}`
   }
 
+
   if (!isOpen || !user) return null
 
   return (
@@ -88,12 +107,22 @@ const UserHistoryModal: React.FC<UserHistoryModalProps> = ({ isOpen, onClose, us
       <div className="bg-gray-900/95 backdrop-blur-md border border-violet-500/30 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-violet-500/20">
           <h2 className="text-2xl font-bold text-white">{user.name}'s Transcription History</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={fetchUserHistory}
+              disabled={isLoading}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white border border-violet-500/30 disabled:opacity-50"
+              title="Refresh History"
+            >
+              &#x21bb;
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[70vh]">
@@ -101,6 +130,11 @@ const UserHistoryModal: React.FC<UserHistoryModalProps> = ({ isOpen, onClose, us
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500"></div>
               <span className="ml-3 text-gray-300">Loading history...</span>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <Clock className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <p className="text-red-400 text-lg">{error}</p>
             </div>
           ) : history.length === 0 ? (
             <div className="text-center py-12">
@@ -260,8 +294,8 @@ const UserList: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/50">
-                {filteredUsers.map((user) => (
-                  <tr key={user._id} className="hover:bg-gray-800/30 transition-colors">
+                {filteredUsers.map((user, key) => (
+                  <tr key={key} className="hover:bg-gray-800/30 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-full flex items-center justify-center">
