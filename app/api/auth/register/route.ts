@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       password: hashedPassword,
       credits: 999, // Start with 999 credits
       plan: "free",
+      status: "user", // Default status is user
       createdAt: new Date(),
       lastLogin: new Date(),
     }
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
       userId,
       email,
       name,
+      status: "user",
     })
 
     // Return user data without password
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
       name,
       credits: 999,
       plan: "free",
+      status: "user",
       createdAt: newUser.createdAt.toISOString(),
       lastLogin: newUser.lastLogin.toISOString(),
     }

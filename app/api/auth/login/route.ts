@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getDatabase } from "@/lib/mongodb"
-import { comparePassword, generateToken } from "@/lib/auth"
+import { verifyPassword, generateToken } from "@/lib/auth"
 import type { User } from "@/lib/models"
 
 export async function POST(request: NextRequest) {
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify password
-    const isValidPassword = await comparePassword(password, user.password)
+    const isValidPassword = await verifyPassword(password, user.password)
     if (!isValidPassword) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
     }
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       userId: user._id!.toString(),
       email: user.email,
       name: user.name,
+      status: user.status,
     })
 
     // Return user data without password
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
       name: user.name,
       credits: user.credits,
       plan: user.plan,
+      status: user.status,
       createdAt: user.createdAt.toISOString(),
       lastLogin: new Date().toISOString(),
     }

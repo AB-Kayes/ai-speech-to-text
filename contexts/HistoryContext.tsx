@@ -1,166 +1,106 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
-import { useAuth } from "./AuthContext"
-import type { TranscriptionHistory } from "@/types/history"
+import { createContext, useContext, useState, useCallback } from "react"
+import type { TranscriptionHistory } from "@/lib/models"
+
+interface HistoryItem {
+  text: string
+  type: "live" | "file"
+  fileName?: string
+  language: string
+  timestamp: string
+  duration?: number
+  confidence?: number
+}
 
 interface HistoryContextType {
-  history: TranscriptionHistory[]
-  addToHistory: (item: Omit<TranscriptionHistory, "id" | "timestamp">) => void
+  history: HistoryItem[]
+  loading: boolean
+  error: string | null
+  addToHistory: (item: Omit<HistoryItem, "timestamp">) => void
+  fetchHistory: () => Promise<void>
   clearHistory: () => void
-  deleteHistoryItem: (id: string) => void
-  searchHistory: (query: string) => TranscriptionHistory[]
-  isLoading: boolean
 }
 
 const HistoryContext = createContext<HistoryContextType | undefined>(undefined)
 
 export const useHistory = () => {
   const context = useContext(HistoryContext)
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useHistory must be used within a HistoryProvider")
   }
   return context
 }
 
 export const HistoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [history, setHistory] = useState<TranscriptionHistory[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const { token, isAuthenticated } = useAuth()
+  const [history, setHistory] = useState<HistoryItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Load history when user is authenticated
-  useEffect(() => {
-    if (isAuthenticated && token) {
-      loadHistory()
-    } else {
-      setHistory([])
+  const addToHistory = useCallback((item: Omit<HistoryItem, "timestamp">) => {
+    const historyItem: HistoryItem = {
+      ...item,
+      timestamp: new Date().toISOString(),
     }
-  }, [isAuthenticated, token])
+    setHistory((prev) => [historyItem, ...prev])
+  }, [])
 
-  const loadHistory = async () => {
-    if (!token) return
+  const fetchHistory = useCallback(async () => {
+    setLoading(true)
+    setError(null)
 
     try {
-      setIsLoading(true)
+      const token = localStorage.getItem("token")
+      if (!token) {
+        setError("Authentication required")
+        return
+      }
+
       const response = await fetch("/api/history", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        setHistory(data.history || [])
+      if (!response.ok) {
+        throw new Error("Failed to fetch history")
       }
-    } catch (error) {
-      console.error("Error loading history:", error)
+
+      const data = await response.json()
+
+      // Transform the database response to match our HistoryItem interface
+      const transformedHistory: HistoryItem[] = data.history.map((item: TranscriptionHistory) => ({
+        text: item.text,
+        type: item.type,
+        fileName: item.fileName,
+        language: item.language,
+        timestamp: item.timestamp.toString(),
+        duration: item.duration,
+        confidence: item.confidence,
+      }))
+
+      setHistory(transformedHistory)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch history")
+      console.error("Error fetching history:", err)
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
+  }, [])
+
+  const clearHistory = useCallback(() => {
+    setHistory([])
+  }, [])
+
+  const value: HistoryContextType = {
+    history,
+    loading,
+    error,
+    addToHistory,
+    fetchHistory,
+    clearHistory,
   }
 
-  const addToHistory = async (item: Omit<TranscriptionHistory, "id" | "timestamp">) => {
-    if (!token) return
-
-    // Avoid duplicate entries by checking if the same text was added recently
-    const recentItem = history[0]
-    if (
-      recentItem &&
-      recentItem.text === item.text &&
-      recentItem.type === item.type &&
-      Date.now() - new Date(recentItem.timestamp).getTime() < 5000
-    ) {
-      return // Skip if same text was added within last 5 seconds
-    }
-
-    try {
-      const response = await fetch("/api/history", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(item),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setHistory((prev) => [data.item, ...prev].slice(0, 100))
-      }
-    } catch (error) {
-      console.error("Error adding to history:", error)
-    }
-  }
-
-  const clearHistory = async () => {
-    if (!token) return
-
-    try {
-      const response = await fetch("/api/history", {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (response.ok) {
-        setHistory([])
-      }
-    } catch (error) {
-      console.error("Error clearing history:", error)
-    }
-  }
-
-  const deleteHistoryItem = async (id: string) => {
-    if (!token) return
-
-    try {
-      const response = await fetch(`/api/history?id=${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (response.ok) {
-        setHistory((prev) => prev.filter((item) => item.id !== id))
-      }
-    } catch (error) {
-      console.error("Error deleting history item:", error)
-    }
-  }
-
-  const searchHistory = (query: string): TranscriptionHistory[] => {
-    try {
-      if (!query.trim()) return history
-
-      const lowercaseQuery = query.toLowerCase()
-      return history.filter((item) => {
-        if (!item || typeof item.text !== "string") return false
-        return (
-          item.text.toLowerCase().includes(lowercaseQuery) ||
-          (item.fileName && item.fileName.toLowerCase().includes(lowercaseQuery))
-        )
-      })
-    } catch (error) {
-      console.error("Error searching history:", error)
-      return []
-    }
-  }
-
-  return (
-    <HistoryContext.Provider
-      value={{
-        history,
-        addToHistory,
-        clearHistory,
-        deleteHistoryItem,
-        searchHistory,
-        isLoading,
-      }}
-    >
-      {children}
-    </HistoryContext.Provider>
-  )
+  return <HistoryContext.Provider value={value}>{children}</HistoryContext.Provider>
 }

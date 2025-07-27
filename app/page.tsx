@@ -179,6 +179,20 @@ function AppContent() {
           language,
           confidence,
         })
+        // Save to database via API
+        fetch("/api/history/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: transcript,
+            type: "live",
+            language,
+            confidence,
+            timestamp: new Date().toISOString(),
+          }),
+        }).catch((err) => {
+          console.error("Failed to save transcript to DB", err)
+        })
       }, 1000) // Wait 1 second after stopping to avoid duplicate entries
 
       return () => clearTimeout(timeoutId)
@@ -282,7 +296,7 @@ function AppContent() {
             )}
 
             {isAuthenticated ? (
-              <UserMenu onOpenCredits={() => setShowCreditModal(true)} />
+              <UserMenu onBuyCredits={() => setShowCreditModal(true)} />
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}

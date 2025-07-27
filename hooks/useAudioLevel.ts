@@ -2,72 +2,71 @@
 
 import { useState, useEffect, useRef } from "react"
 
-const useAudioLevel = (isRecording: boolean) => {
+export const useAudioLevel = (isListening: boolean): number => {
   const [audioLevel, setAudioLevel] = useState(0)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
+  const dataArrayRef = useRef<Uint8Array | null>(null)
   const animationRef = useRef<number>()
 
   useEffect(() => {
-    let stream: MediaStream | null = null
-
-    const setupAudio = async () => {
-      if (!isRecording) {
-        if (stream) {
-          stream.getTracks().forEach((track) => track.stop())
-        }
-        if (audioContextRef.current) {
-          audioContextRef.current.close()
-        }
-        if (animationRef.current) {
-          cancelAnimationFrame(animationRef.current)
-        }
-        setAudioLevel(0)
-        return
+    if (!isListening) {
+      setAudioLevel(0)
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
       }
+      return
+    }
 
+    const setupAudioAnalysis = async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        audioContextRef.current = new AudioContext()
-        analyserRef.current = audioContextRef.current.createAnalyser()
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const audioContext = new AudioContext()
+        const source = audioContext.createMediaStreamSource(stream)
+        const analyser = audioContext.createAnalyser()
 
-        const source = audioContextRef.current.createMediaStreamSource(stream)
-        source.connect(analyserRef.current)
-
-        analyserRef.current.fftSize = 256
-        const bufferLength = analyserRef.current.frequencyBinCount
+        analyser.fftSize = 256
+        const bufferLength = analyser.frequencyBinCount
         const dataArray = new Uint8Array(bufferLength)
 
+        source.connect(analyser)
+        analyserRef.current = analyser
+        dataArrayRef.current = dataArray
+
         const updateAudioLevel = () => {
-          if (analyserRef.current) {
-            analyserRef.current.getByteFrequencyData(dataArray)
-            const average = dataArray.reduce((a, b) => a + b) / bufferLength
-            setAudioLevel(average / 255)
+          if (!analyserRef.current || !dataArrayRef.current) return
+
+          analyserRef.current.getByteFrequencyData(dataArrayRef.current)
+
+          // Calculate average volume
+          let sum = 0
+          for (let i = 0; i < dataArrayRef.current.length; i++) {
+            sum += dataArrayRef.current[i]
           }
-          animationRef.current = requestAnimationFrame(updateAudioLevel)
+          const average = sum / dataArrayRef.current.length
+
+          // Normalize to 0-1 range
+          const normalizedLevel = Math.min(average / 128, 1)
+          setAudioLevel(normalizedLevel)
+
+          if (isListening) {
+            animationRef.current = requestAnimationFrame(updateAudioLevel)
+          }
         }
 
         updateAudioLevel()
       } catch (error) {
-        console.error("Error accessing microphone:", error)
+        console.error("Error setting up audio analysis:", error)
       }
     }
 
-    setupAudio()
+    setupAudioAnalysis()
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop())
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close()
-      }
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [isRecording])
+  }, [isListening])
 
   return audioLevel
 }

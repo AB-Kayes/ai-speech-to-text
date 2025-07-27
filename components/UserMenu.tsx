@@ -2,84 +2,94 @@
 
 import type React from "react"
 import { useState } from "react"
-import { User, LogOut, CreditCard, Settings, ChevronDown } from "lucide-react"
+import { User, LogOut, CreditCard } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 
 interface UserMenuProps {
-  onOpenCredits: () => void
+  onBuyCredits?: () => void;
 }
 
-const UserMenu: React.FC<UserMenuProps> = ({ onOpenCredits }) => {
+const UserMenu: React.FC<UserMenuProps> = ({ onBuyCredits }) => {
   const [isOpen, setIsOpen] = useState(false)
   const { user, logout } = useAuth()
 
   if (!user) return null
 
+  const handleLogout = () => {
+    logout()
+    setIsOpen(false)
+  }
+
+  const formatTime = (credits: number) => {
+    const totalSeconds = credits * 2 // 1 credit = 2 seconds
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = totalSeconds % 60
+    return `${minutes}m ${seconds}s`
+  }
+
   return (
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 lg:gap-3 px-3 lg:px-4 py-2 bg-gray-900/50 border border-violet-500/30 rounded-lg hover:bg-gray-800 transition-all duration-300 backdrop-blur-sm"
+        className="flex items-center gap-2 px-4 py-2 bg-gray-900/50 border border-violet-500/50 rounded-lg hover:bg-gradient-to-r hover:from-violet-600 hover:to-purple-600 transition-all duration-300 backdrop-blur-sm"
       >
-        <div className="w-6 lg:w-8 h-6 lg:h-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-full flex items-center justify-center">
-          <User className="w-3 lg:w-4 h-3 lg:h-4 text-white" />
+        <div className="w-8 h-8 bg-gradient-to-r from-violet-600 to-purple-600 rounded-full flex items-center justify-center">
+          <User className="w-4 h-4 text-white" />
         </div>
         <div className="text-left hidden sm:block">
-          <p className="text-white font-medium text-xs lg:text-sm">{user.name}</p>
-          <p className="text-violet-300 text-xs">{user.credits} credits</p>
+          <div className="text-sm font-semibold text-white">{user.name}</div>
+          <div className="text-xs text-violet-300">
+            {user.credits} credits ({formatTime(user.credits)})
+          </div>
         </div>
-        <ChevronDown
-          className={`w-3 lg:w-4 h-3 lg:h-4 text-white transition-transform ${isOpen ? "rotate-180" : ""}`}
-        />
       </button>
 
       {isOpen && (
-        <div className="absolute top-full right-0 mt-2 w-56 lg:w-64 bg-gray-900/90 backdrop-blur-md border border-violet-500/30 rounded-lg shadow-xl z-50">
-          <div className="p-4 border-b border-violet-500/20">
-            <p className="text-white font-medium text-sm lg:text-base">{user.name}</p>
-            <p className="text-gray-300 text-xs lg:text-sm">{user.email}</p>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs lg:text-sm text-gray-300">Credits:</span>
-              <span className="text-violet-300 font-semibold text-xs lg:text-sm">{user.credits}</span>
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute right-0 top-full mt-2 w-64 bg-gray-900/95 backdrop-blur-sm border border-violet-500/30 rounded-lg shadow-xl z-50">
+            <div className="p-4 border-b border-violet-500/20">
+              <div className="text-sm font-semibold text-white">{user.name}</div>
+              <div className="text-xs text-gray-400">{user.email}</div>
+              <div className="text-xs text-violet-300 mt-1">
+                {user.credits} credits remaining ({formatTime(user.credits)})
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs lg:text-sm text-gray-300">Plan:</span>
-              <span className="text-violet-300 font-semibold capitalize text-xs lg:text-sm">{user.plan}</span>
+
+            <div className="p-2">
+
+              <button
+                onClick={() => {
+                  if (onBuyCredits) onBuyCredits();
+                  setIsOpen(false)
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-gray-300 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-left"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span className="text-sm">Buy Credits</span>
+              </button>
+
+                <button
+                onClick={() => {
+                  window.location.href = "/admin";
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-gray-300 hover:bg-gray-800 hover:text-white rounded-lg transition-colors text-left"
+                >
+                <User className="w-4 h-4" />
+                <span className="text-sm">Admin Page</span>
+                </button>
+
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-3 py-2 text-gray-300 hover:bg-gray-800 hover:text-red-400 rounded-lg transition-colors text-left"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm">Sign Out</span>
+              </button>
             </div>
           </div>
-
-          <div className="p-2">
-            <button
-              onClick={() => {
-                onOpenCredits()
-                setIsOpen(false)
-              }}
-              className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <CreditCard className="w-4 h-4 text-violet-400" />
-              <span className="text-white text-sm lg:text-base">Buy Credits</span>
-            </button>
-
-            <button
-              onClick={() => setIsOpen(false)}
-              className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <Settings className="w-4 h-4 text-gray-400" />
-              <span className="text-white text-sm lg:text-base">Settings</span>
-            </button>
-
-            <button
-              onClick={() => {
-                logout()
-                setIsOpen(false)
-              }}
-              className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-800 rounded-lg transition-colors text-violet-300"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="text-sm lg:text-base">Sign Out</span>
-            </button>
-          </div>
-        </div>
+        </>
       )}
     </div>
   )

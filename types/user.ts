@@ -3,7 +3,8 @@ export interface User {
   email: string
   name: string
   credits: number
-  plan: "free" | "premium" | "enterprise"
+  plan: "free" | "premium"
+  status: "user" | "admin"
   createdAt: string
   lastLogin: string
 }
@@ -12,22 +13,4 @@ export interface AuthState {
   user: User | null
   isAuthenticated: boolean
   isLoading: boolean
-}
-
-export interface CreditTransaction {
-  id: string
-  userId: string
-  amount: number
-  type: "purchase" | "usage" | "bonus"
-  description: string
-  timestamp: string
-}
-
-export interface PricingPlan {
-  id: string
-  name: string
-  price: number
-  credits: number
-  features: string[]
-  popular?: boolean
 }

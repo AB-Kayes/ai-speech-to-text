@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       name: user.name,
       credits: user.credits,
       plan: user.plan,
+      status: user.status,
       createdAt: user.createdAt.toISOString(),
       lastLogin: user.lastLogin.toISOString(),
     }

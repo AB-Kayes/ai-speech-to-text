@@ -6,7 +6,8 @@ export interface User {
   name: string
   password: string
   credits: number
-  plan: "free" | "premium" | "enterprise"
+  plan: "free" | "premium"
+  status: "user" | "admin"
   createdAt: Date
   lastLogin: Date
 }
@@ -42,7 +43,7 @@ export interface CreditTransaction {
   _id?: ObjectId
   userId: ObjectId
   amount: number
-  type: "purchase" | "usage" | "bonus"
+  type: "purchase" | "usage" | "refund"
   description: string
   paymentId?: ObjectId
   timestamp: Date

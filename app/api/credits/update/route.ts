@@ -21,21 +21,16 @@ export async function POST(request: NextRequest) {
     const users = db.collection<User>("users")
     const transactions = db.collection<CreditTransaction>("credit_transactions")
 
-    // Get current user
-    const user = await users.findOne({ _id: new ObjectId(userPayload.userId) })
-    if (!user) {
+    // Update user credits
+    const result = await users.findOneAndUpdate(
+      { _id: new ObjectId(userPayload.userId) },
+      { $inc: { credits: amount } },
+      { returnDocument: "after" },
+    )
+
+    if (!result) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
-
-    // Check if user has enough credits for negative amounts
-    const newCredits = Math.max(0, user.credits + amount)
-
-    if (amount < 0 && user.credits + amount < 0) {
-      return NextResponse.json({ error: "Insufficient credits" }, { status: 400 })
-    }
-
-    // Update user credits
-    await users.updateOne({ _id: new ObjectId(userPayload.userId) }, { $set: { credits: newCredits } })
 
     // Record transaction
     const transaction: Omit<CreditTransaction, "_id"> = {
@@ -49,8 +44,8 @@ export async function POST(request: NextRequest) {
     await transactions.insertOne(transaction)
 
     return NextResponse.json({
-      credits: newCredits,
-      success: true,
+      credits: result.credits,
+      message: "Credits updated successfully",
     })
   } catch (error) {
     console.error("Update credits error:", error)

@@ -4,20 +4,15 @@ import { getDatabase } from "@/lib/mongodb"
 import { getUserFromRequest } from "@/lib/auth"
 import type { User, TranscriptionHistory } from "@/lib/models"
 
-// Admin credentials check
-function isAdmin(email: string): boolean {
-  return email === "admin@aaladin.com"
-}
-
 export async function GET(request: NextRequest) {
   try {
     const userPayload = getUserFromRequest(request)
-    if (!userPayload || !isAdmin(userPayload.email)) {
+    if (!userPayload || userPayload.status !== "admin") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const url = new URL(request.url)
-    const userId = url.searchParams.get("userId")
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get("userId")
 
     const db = await getDatabase()
     const users = db.collection<User>("users")
@@ -33,7 +28,6 @@ export async function GET(request: NextRequest) {
       const userHistory = await history
         .find({ userId: new ObjectId(userId) })
         .sort({ timestamp: -1 })
-        .limit(50)
         .toArray()
 
       const formattedHistory = userHistory.map((item) => ({
@@ -43,15 +37,17 @@ export async function GET(request: NextRequest) {
         fileName: item.fileName,
         language: item.language,
         timestamp: item.timestamp.toISOString(),
+        duration: item.duration,
         confidence: item.confidence,
       }))
 
       const userData = {
         id: user._id!.toString(),
-        name: user.name,
         email: user.email,
+        name: user.name,
         credits: user.credits,
         plan: user.plan,
+        status: user.status,
         createdAt: user.createdAt.toISOString(),
         lastLogin: user.lastLogin.toISOString(),
         history: formattedHistory,
@@ -60,17 +56,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ user: userData })
     } else {
       // Get all users
-      const allUsers = await users
-        .find({}, { projection: { password: 0 } })
-        .sort({ createdAt: -1 })
-        .toArray()
+      const allUsers = await users.find({}).sort({ createdAt: -1 }).toArray()
 
       const formattedUsers = allUsers.map((user) => ({
         id: user._id!.toString(),
-        name: user.name,
         email: user.email,
+        name: user.name,
         credits: user.credits,
         plan: user.plan,
+        status: user.status,
         createdAt: user.createdAt.toISOString(),
         lastLogin: user.lastLogin.toISOString(),
       }))
@@ -79,6 +73,37 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error("Get admin users error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const userPayload = getUserFromRequest(request)
+    if (!userPayload || userPayload.status !== "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { userId, status } = await request.json()
+
+    if (!userId || !status || !["user", "admin"].includes(status)) {
+      return NextResponse.json({ error: "Invalid user ID or status" }, { status: 400 })
+    }
+
+    const db = await getDatabase()
+    const users = db.collection<User>("users")
+
+    const result = await users.updateOne({ _id: new ObjectId(userId) }, { $set: { status } })
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    return NextResponse.json({
+      message: `User status updated to ${status} successfully`,
+    })
+  } catch (error) {
+    console.error("Update user status error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

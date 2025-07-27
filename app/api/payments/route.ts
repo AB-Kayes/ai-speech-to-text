@@ -17,12 +17,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Validate phone number format (basic validation for Bangladeshi numbers)
-    const phoneRegex = /^(\+88)?01[3-9]\d{8}$/
-    if (!phoneRegex.test(phoneNumber)) {
-      return NextResponse.json({ error: "Invalid phone number format" }, { status: 400 })
-    }
-
     const db = await getDatabase()
     const payments = db.collection<Payment>("payments")
     const users = db.collection<User>("users")
@@ -39,28 +33,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Transaction ID already exists" }, { status: 400 })
     }
 
-    // Create payment record
-    const payment: Omit<Payment, "_id"> = {
+    const newPayment: Omit<Payment, "_id"> = {
       userId: new ObjectId(userPayload.userId),
       userName: user.name,
       userEmail: user.email,
       phoneNumber,
       transactionId,
-      amount,
-      credits,
+      amount: Number(amount),
+      credits: Number(credits),
       status: "pending",
       createdAt: new Date(),
     }
 
-    const result = await payments.insertOne(payment)
+    const result = await payments.insertOne(newPayment)
 
     return NextResponse.json({
-      paymentId: result.insertedId.toString(),
-      status: "pending",
-      message: "Payment submitted for approval",
+      id: result.insertedId.toString(),
+      message: "Payment submitted successfully. Awaiting admin approval.",
     })
   } catch (error) {
-    console.error("Payment submission error:", error)
+    console.error("Submit payment error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
