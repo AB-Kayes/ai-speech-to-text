@@ -43,8 +43,10 @@ function AppContent() {
   const { user, isAuthenticated, updateCredits } = useAuth()
   const { addToHistory } = useHistory()
 
-  // Use only Deepgram for speech recognition
-  const currentRecognition = useDeepgramSpeechRecognition(selectedLanguage, punctuationOptions)
+  // Always call both hooks, select result based on language
+  const recognitionBangla = require("@/hooks/useSonioxSpeechRecognition").default(selectedLanguage, punctuationOptions)
+  const recognitionOther = require("@/hooks/useDeepgramSpeechRecognition").default(selectedLanguage, punctuationOptions)
+  const currentRecognition = selectedLanguage === "bn-BD" ? recognitionBangla : recognitionOther
 
   const {
     transcript,
@@ -120,9 +122,9 @@ function AppContent() {
 
       // Deduct credits for file processing (10 credits per file)
       updateCredits(-10)
-      showNotification(language === "bn-BD" ? "অডিও ফাইল সফলভাবে প্রক্রিয়াকৃত!" : "Audio file processed successfully!")
+      showNotification("Audio file processed successfully!")
     } catch (error) {
-      showNotification(language === "bn-BD" ? "অডিও ফাইল প্রক্রিয়াকরণে ত্রুটি" : "Error processing audio file")
+      showNotification("Error processing audio file")
     } finally {
       setIsProcessing(false)
     }
@@ -130,20 +132,12 @@ function AppContent() {
 
   const handleCopy = async (text: string) => {
     const success = await copyToClipboard(text)
-    showNotification(
-      success
-        ? language === "bn-BD"
-          ? "ক্লিপবোর্ডে কপি করা হয়েছে!"
-          : "Copied to clipboard!"
-        : language === "bn-BD"
-          ? "কপি করতে ব্যর্থ"
-          : "Failed to copy",
-    )
+    showNotification(success ? "Copied to clipboard!" : "Failed to copy")
   }
 
   const handleDownload = (text: string, filename: string) => {
     downloadTranscript(text, filename)
-    showNotification(language === "bn-BD" ? "ট্রান্সক্রিপ্ট ডাউনলোড হয়েছে!" : "Transcript downloaded!")
+    showNotification("Transcript downloaded!")
   }
 
   const toggleRecording = () => {
@@ -205,16 +199,21 @@ function AppContent() {
 
   const handleResetTranscript = () => {
     resetTranscript()
-    showNotification(language === "bn-BD" ? "ট্রান্সক্রিপ্ট পরিষ্কার করা হয়েছে" : "Transcript cleared")
+    showNotification("Transcript cleared")
   }
 
   const handleLanguageChange = (newLanguage: Language) => {
-    setSelectedLanguage(newLanguage)
     setLanguage(newLanguage)
     // Reset transcripts when changing language
     resetTranscript()
     setFileTranscript("")
-    showNotification(`Language changed to ${newLanguage === "en-US" ? "English" : "বাংলা"}`)
+    if (newLanguage === "bn-BD") {
+      showNotification("Language changed to Bangla")
+    } else if (newLanguage === "en-US") {
+      showNotification("Language changed to English")
+    } else {
+      showNotification(`Language changed to ${newLanguage}`)
+    }
   }
 
   const handlePunctuationChange = (options: PunctuationOptions) => {
@@ -234,14 +233,11 @@ function AppContent() {
   }
 
   const getPlaceholderText = () => {
-    if (language === "bn-BD") {
-      return isListening ? "শুনছি... কথা বলা শুরু করুন!" : "রেকর্ডিং শুরু করতে মাইক্রোফোনে ক্লিক করুন"
-    }
     return isListening ? "Listening... Start speaking!" : "Click the microphone to start recording"
   }
 
   const getReadyText = () => {
-    return language === "bn-BD" ? "আপনার কণ্ঠস্বর ক্যাপচার করতে প্রস্তুত..." : "Ready to capture your voice..."
+    return "Ready to capture your voice..."
   }
 
   return (
@@ -370,9 +366,7 @@ function AppContent() {
               <h2 className="text-xl lg:text-3xl font-bold text-white mb-2 font-montserrat">Live Speech Recognition</h2>
               <div className="w-12 lg:w-16 h-0.5 bg-gradient-to-r from-violet-500 to-purple-500 mx-auto mb-3 lg:mb-4"></div>
               <p className="text-gray-400 font-light text-sm lg:text-base">
-                {language === "bn-BD"
-                  ? "রেকর্ডিং শুরু করতে মাইক্রোফোনে ক্লিক করুন"
-                  : "Click the microphone to start recording"}
+                {"Click the microphone to start recording"}
               </p>
             </div>
 
@@ -476,7 +470,7 @@ function AppContent() {
               <div className="space-y-3 lg:space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg lg:text-xl font-bold text-white font-montserrat">
-                    {language === "bn-BD" ? "লাইভ ট্রান্সক্রিপ্ট" : "Live Transcript"}
+                  {"Live Transcript"}
                   </h3>
                   {transcript && (
                     <button
@@ -485,7 +479,7 @@ function AppContent() {
                     >
                       <RotateCcw className="w-3 lg:w-4 h-3 lg:h-4" />
                       <span className="text-white font-medium hidden sm:inline">
-                        {language === "bn-BD" ? "পরিষ্কার" : "Clear"}
+                        {"Clear"}
                       </span>
                     </button>
                   )}
@@ -510,7 +504,7 @@ function AppContent() {
                     >
                       <Copy className="w-3 lg:w-4 h-3 lg:h-4" />
                       <span className="text-xs lg:text-sm text-white font-medium">
-                        {language === "bn-BD" ? "কপি" : "Copy"}
+                    {"Copy"}
                       </span>
                     </button>
                     <button
@@ -519,7 +513,7 @@ function AppContent() {
                     >
                       <Download className="w-3 lg:w-4 h-3 lg:h-4" />
                       <span className="text-xs lg:text-sm text-white font-medium">
-                        {language === "bn-BD" ? "ডাউনলোড" : "Download"}
+                    {"Download"}
                       </span>
                     </button>
                   </div>
@@ -537,9 +531,7 @@ function AppContent() {
               <h2 className="text-xl lg:text-3xl font-bold text-white mb-2 font-montserrat">Audio File Processing</h2>
               <div className="w-12 lg:w-16 h-0.5 bg-gradient-to-r from-violet-500 to-purple-500 mx-auto mb-3 lg:mb-4"></div>
               <p className="text-gray-400 font-light text-sm lg:text-base">
-                {language === "bn-BD"
-                  ? "ট্রান্সক্রিপশনের জন্য একটি অডিও ফাইল আপলোড করুন"
-                  : "Upload an audio file for transcription"}
+                {"Upload an audio file for transcription"}
               </p>
             </div>
 
@@ -553,14 +545,10 @@ function AppContent() {
                 <p className="text-gray-200 mb-2 font-medium text-sm lg:text-base">
                   {uploadedFile
                     ? uploadedFile.name
-                    : language === "bn-BD"
-                      ? "অডিও ফাইল আপলোড করতে ক্লিক করুন"
-                      : "Click to upload audio file"}
+                    : "Click to upload audio file"}
                 </p>
                 <p className="text-xs lg:text-sm text-gray-400 font-light">
-                  {language === "bn-BD"
-                    ? "MP3, WAV, M4A এবং অন্যান্য অডিও ফরম্যাট সমর্থিত"
-                    : "Supports MP3, WAV, M4A, and other audio formats"}
+                  {"Supports MP3, WAV, M4A, and other audio formats"}
                 </p>
                 <input ref={fileInputRef} type="file" accept="audio/*" onChange={handleFileUpload} className="hidden" />
               </div>
@@ -570,7 +558,7 @@ function AppContent() {
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-6 lg:h-8 w-6 lg:w-8 border-b-2 border-violet-500 mx-auto mb-3 lg:mb-4"></div>
                   <p className="text-gray-300 font-medium text-sm lg:text-base">
-                    {language === "bn-BD" ? "অডিও ফাইল প্রক্রিয়াকরণ..." : "Processing audio file..."}
+                    {"Processing audio file..."}
                   </p>
                 </div>
               )}
@@ -579,7 +567,7 @@ function AppContent() {
               {fileTranscript && (
                 <div className="space-y-3 lg:space-y-4">
                   <h3 className="text-lg lg:text-xl font-bold text-white font-montserrat">
-                    {language === "bn-BD" ? "ফাইল ট্রান্সক্রিপ্ট" : "File Transcript"}
+                    {"File Transcript"}
                   </h3>
                   <div className="bg-black/70 border border-violet-500/10 rounded-lg p-3 lg:p-4 min-h-24 lg:min-h-32 max-h-48 lg:max-h-64 overflow-y-auto">
                     <p className="text-gray-100 whitespace-pre-wrap font-light leading-relaxed text-sm lg:text-base">
@@ -594,7 +582,7 @@ function AppContent() {
                     >
                       <Copy className="w-3 lg:w-4 h-3 lg:h-4" />
                       <span className="text-xs lg:text-sm text-white font-medium">
-                        {language === "bn-BD" ? "কপি" : "Copy"}
+                    {"Copy"}
                       </span>
                     </button>
                     <button
@@ -603,7 +591,7 @@ function AppContent() {
                     >
                       <Download className="w-3 lg:w-4 h-3 lg:h-4" />
                       <span className="text-xs lg:text-sm text-white font-medium">
-                        {language === "bn-BD" ? "ডাউনলোড" : "Download"}
+                    {"Download"}
                       </span>
                     </button>
                   </div>
@@ -627,9 +615,7 @@ function AppContent() {
             <h3 className="text-lg lg:text-xl font-bold text-white mb-2 font-montserrat">Real-time Recognition</h3>
             <div className="w-8 lg:w-12 h-0.5 bg-gradient-to-r from-violet-500 to-purple-500 mx-auto mb-2 lg:mb-3"></div>
             <p className="text-gray-400 text-xs lg:text-sm font-light leading-relaxed">
-              {language === "bn-BD"
-                ? "উচ্চ নির্ভুলতা এবং কম বিলম্বের সাথে তাৎক্ষণিক বক্তৃতা-থেকে-পাঠ্য রূপান্তর"
-                : "Instant speech-to-text conversion with high accuracy and low latency"}
+              {"Instant speech-to-text conversion with high accuracy and low latency"}
             </p>
           </GlassCard>
 
@@ -640,9 +626,7 @@ function AppContent() {
             <h3 className="text-lg lg:text-xl font-bold text-white mb-2 font-montserrat">File Processing</h3>
             <div className="w-8 lg:w-12 h-0.5 bg-gradient-to-r from-violet-500 to-purple-500 mx-auto mb-2 lg:mb-3"></div>
             <p className="text-gray-400 text-xs lg:text-sm font-light leading-relaxed">
-              {language === "bn-BD"
-                ? "সহজেই বিভিন্ন ফরম্যাটের অডিও ফাইল আপলোড এবং ট্রান্সক্রাইব করুন"
-                : "Upload and transcribe audio files of various formats with ease"}
+              {"Upload and transcribe audio files of various formats with ease"}
             </p>
           </GlassCard>
 
@@ -653,9 +637,7 @@ function AppContent() {
             <h3 className="text-lg lg:text-xl font-bold text-white mb-2 font-montserrat">Export Options</h3>
             <div className="w-8 lg:w-12 h-0.5 bg-gradient-to-r from-violet-500 to-purple-500 mx-auto mb-2 lg:mb-3"></div>
             <p className="text-gray-400 text-xs lg:text-sm font-light leading-relaxed">
-              {language === "bn-BD"
-                ? "ক্লিপবোর্ডে কপি করুন বা একাধিক ফরম্যাটে ট্রান্সক্রিপ্ট ডাউনলোড করুন"
-                : "Copy to clipboard or download transcripts in multiple formats"}
+              {"Copy to clipboard or download transcripts in multiple formats"}
             </p>
           </GlassCard>
         </div>
