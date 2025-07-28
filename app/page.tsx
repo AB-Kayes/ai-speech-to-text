@@ -40,6 +40,27 @@ function AppContent() {
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Helper to save credit transaction to DB
+  const saveCreditTransaction = async (amount: number, reason: string) => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    try {
+      await fetch("/api/credits/update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          amount,
+          description: reason,
+          type: "usage",
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to save credit transaction", err);
+    }
+  };
+
   const { user, isAuthenticated, updateCredits } = useAuth()
   const { addToHistory } = useHistory()
 
@@ -122,6 +143,7 @@ function AppContent() {
 
       // Deduct credits for file processing (10 credits per file)
       updateCredits(-10)
+      saveCreditTransaction(-10, "Audio file processing")
       showNotification("Audio file processed successfully!")
     } catch (error) {
       showNotification("Error processing audio file")
@@ -158,7 +180,13 @@ function AppContent() {
         return
       }
 
+      // Clear transcript when starting a new recording in English or Bangla
+      if (selectedLanguage === "en-US" || selectedLanguage === "bn-BD") {
+        resetTranscript()
+      }
       startListening()
+      // Save credit transaction for live recording start (deduct 1 credit for 2 seconds)
+      saveCreditTransaction(-1, "Live recording started")
       // Credits will now be deducted every 2 seconds by useCreditTimer hook
     }
   }
@@ -203,6 +231,7 @@ function AppContent() {
   }
 
   const handleLanguageChange = (newLanguage: Language) => {
+    setSelectedLanguage(newLanguage)
     setLanguage(newLanguage)
     // Reset transcripts when changing language
     resetTranscript()
@@ -374,7 +403,7 @@ function AppContent() {
             <div className="flex justify-center mb-4 lg:mb-6">
               <div className="flex flex-col sm:flex-row gap-2 lg:gap-4 w-full sm:w-auto">
                 <LanguageSelector
-                  currentLanguage={language}
+                  currentLanguage={selectedLanguage}
                   onLanguageChange={handleLanguageChange}
                   disabled={isListening}
                 />
